@@ -130,22 +130,27 @@ const SnakeDominoBoard: React.FC<SnakeDominoBoardProps> = ({
   }
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      {/* Board container */}
-      <div className="relative w-full h-full flex items-center justify-center">
-        <div className="relative">
+    <div className="relative w-full h-full min-h-[200px] bg-domino-900/20 rounded-lg border border-white/10">
+      {/* Board container with proper sizing */}
+      <div className="relative w-full h-full flex items-center justify-center p-4">
+        <div className="relative" style={{ minWidth: '100%', minHeight: '100px' }}>
+          {/* Debug info - show board state */}
+          <div className="absolute top-0 left-0 text-xs text-green-400 bg-black/50 px-2 py-1 rounded z-30">
+            Board: {tiles.length} tiles
+          </div>
+
           {/* Left position indicator */}
-          {selectedTile && (
+          {selectedTile && layout.length > 0 && (
             <motion.button
               onClick={() => onPositionClick('left')}
-              className={`absolute z-20 w-6 h-8 rounded border-2 border-dashed transition-colors ${
+              className={`absolute z-20 w-8 h-10 rounded border-2 border-dashed transition-colors ${
                 canPlaceLeft 
                   ? 'bg-green-400/50 border-green-400 hover:bg-green-400/70' 
                   : 'bg-red-400/50 border-red-400 cursor-not-allowed'
               }`}
               style={{
-                left: layout[0]?.x - 32,
-                top: layout[0]?.y + 2
+                left: Math.max(0, (layout[0]?.x || 0) - 36),
+                top: (layout[0]?.y || 0) + 2
               }}
               initial={{ scale: 0, x: -10 }}
               animate={{ scale: 1, x: 0 }}
@@ -156,29 +161,32 @@ const SnakeDominoBoard: React.FC<SnakeDominoBoardProps> = ({
             </motion.button>
           )}
 
-          {/* Domino tiles */}
+          {/* Domino tiles - MAIN ISSUE WAS HERE */}
           {layout.map(({ tile, x, y, index, rotation, isConnected }) => (
             <motion.div
-              key={`${tile.id}-${index}`}
-              className="absolute"
+              key={`board-tile-${tile.id}-${index}`}
+              className="absolute z-10"
               style={{
-                left: x,
-                top: y,
-                transformOrigin: 'center center'
+                left: x + 40, // Add offset to ensure visibility
+                top: y + 20,  // Add offset to ensure visibility
+                transformOrigin: 'center center',
+                minWidth: '64px',
+                minHeight: '32px'
               }}
-              initial={{ scale: 0, rotate: rotation + 180 }}
+              initial={{ scale: 0, rotate: rotation + 180, opacity: 0 }}
               animate={{ 
                 scale: 1, 
                 rotate: rotation,
+                opacity: 1,
                 filter: isConnected ? 'none' : 'hue-rotate(0deg) saturate(1.5)'
               }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+              transition={{ duration: 0.6, delay: index * 0.15 }}
             >
               <div className="relative">
                 <DominoTile 
                   tile={tile} 
                   size="medium"
-                  className={`${!isConnected ? 'ring-2 ring-red-500' : ''}`}
+                  className={`shadow-lg ${!isConnected ? 'ring-2 ring-red-500' : 'ring-1 ring-white/20'}`}
                 />
                 
                 {/* Connection validation indicator */}
@@ -194,7 +202,7 @@ const SnakeDominoBoard: React.FC<SnakeDominoBoardProps> = ({
                 )}
 
                 {/* Show dot values for debugging */}
-                <div className="absolute -bottom-6 left-0 right-0 text-center text-xs text-domino-400">
+                <div className="absolute -bottom-6 left-0 right-0 text-center text-xs text-domino-300 font-mono">
                   {tile.leftDots}-{tile.rightDots}
                 </div>
               </div>
@@ -205,14 +213,14 @@ const SnakeDominoBoard: React.FC<SnakeDominoBoardProps> = ({
           {selectedTile && layout.length > 0 && (
             <motion.button
               onClick={() => onPositionClick('right')}
-              className={`absolute z-20 w-6 h-8 rounded border-2 border-dashed transition-colors ${
+              className={`absolute z-20 w-8 h-10 rounded border-2 border-dashed transition-colors ${
                 canPlaceRight 
                   ? 'bg-green-400/50 border-green-400 hover:bg-green-400/70' 
                   : 'bg-red-400/50 border-red-400 cursor-not-allowed'
               }`}
               style={{
-                left: layout[layout.length - 1]?.x + 64 + 8,
-                top: layout[layout.length - 1]?.y + 2
+                left: Math.max(0, (layout[layout.length - 1]?.x || 0) + 104),
+                top: (layout[layout.length - 1]?.y || 0) + 22
               }}
               initial={{ scale: 0, x: 10 }}
               animate={{ scale: 1, x: 0 }}
@@ -223,51 +231,55 @@ const SnakeDominoBoard: React.FC<SnakeDominoBoardProps> = ({
             </motion.button>
           )}
 
-          {/* Connection lines */}
-          <svg 
-            className="absolute inset-0 pointer-events-none"
-            style={{ 
-              width: Math.max(...layout.map(l => l.x)) + 100,
-              height: Math.max(...layout.map(l => l.y)) + 50
-            }}
-          >
-            {layout.slice(0, -1).map((current, index) => {
-              const next = layout[index + 1]
-              const isValidConnection = current.isConnected && next.isConnected
-              
-              return (
-                <motion.line
-                  key={`connection-${index}`}
-                  x1={current.x + 32}
-                  y1={current.y + 16}
-                  x2={next.x + 32}
-                  y2={next.y + 16}
-                  stroke={isValidConnection ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.5)"}
-                  strokeWidth={2}
-                  strokeDasharray={isValidConnection ? "none" : "4,4"}
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.3, delay: (index + 1) * 0.1 }}
-                />
-              )
-            })}
-          </svg>
+          {/* Connection lines between tiles */}
+          {layout.length > 1 && (
+            <svg 
+              className="absolute inset-0 pointer-events-none z-5"
+              style={{ 
+                width: '100%',
+                height: '100%',
+                minWidth: Math.max(...layout.map(l => l.x)) + 150,
+                minHeight: Math.max(...layout.map(l => l.y)) + 80
+              }}
+            >
+              {layout.slice(0, -1).map((current, index) => {
+                const next = layout[index + 1]
+                const isValidConnection = current.isConnected && next.isConnected
+                
+                return (
+                  <motion.line
+                    key={`connection-${index}`}
+                    x1={current.x + 72}
+                    y1={current.y + 36}
+                    x2={next.x + 72}
+                    y2={next.y + 36}
+                    stroke={isValidConnection ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.7)"}
+                    strokeWidth={2}
+                    strokeDasharray={isValidConnection ? "none" : "4,4"}
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.4, delay: (index + 1) * 0.15 }}
+                  />
+                )
+              })}
+            </svg>
+          )}
         </div>
       </div>
 
-      {/* Board info panel */}
-      <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm">
+      {/* Board info panel - Enhanced */}
+      <div className="absolute bottom-2 left-2 bg-black/80 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm border border-white/20">
         <div className="flex gap-4">
-          <span>Tiles: {tiles.length}</span>
-          <span>Left: {leftEnd}</span>
-          <span>Right: {rightEnd}</span>
+          <span className="text-green-400">Tiles: {tiles.length}</span>
+          <span className="text-blue-400">Left: {leftEnd}</span>
+          <span className="text-purple-400">Right: {rightEnd}</span>
         </div>
       </div>
 
       {/* Connection validation summary */}
       {layout.some(l => !l.isConnected) && (
         <motion.div
-          className="absolute top-2 right-2 bg-red-500/90 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm"
+          className="absolute top-2 right-2 bg-red-500/90 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm border border-red-400"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >

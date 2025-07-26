@@ -93,11 +93,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const dealTiles = (players: Player[], dominoSet: DominoTile[]): { updatedPlayers: Player[], remainingTiles: DominoTile[] } => {
     const tilesPerPlayer = players.length <= 2 ? 7 : 6
-    let tileIndex = 0
     
     const updatedPlayers = players.map((player, playerIndex) => ({
       ...player,
-      hand: dominoSet.slice(tileIndex + (playerIndex * tilesPerPlayer), tileIndex + ((playerIndex + 1) * tilesPerPlayer))
+      hand: dominoSet.slice(playerIndex * tilesPerPlayer, (playerIndex + 1) * tilesPerPlayer)
     }))
     
     const totalTilesDealt = players.length * tilesPerPlayer
