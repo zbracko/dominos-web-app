@@ -164,8 +164,14 @@ class MultiplayerService {
   public startGame(): void {
     if (!this.currentRoom || !this.canStartGame()) return
 
+    console.log('🎮 Starting local multiplayer game for room:', this.currentRoom.id)
+    
     this.currentRoom.status = 'playing'
+    this.currentRoom.gameStartedAt = new Date().toISOString()
     this.saveRoomToStorage(this.currentRoom)
+    
+    console.log('✅ Local room status updated to playing')
+    
     this.emit('game_started', { room: this.currentRoom })
   }
 

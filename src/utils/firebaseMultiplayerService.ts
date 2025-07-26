@@ -184,11 +184,19 @@ class FirebaseMultiplayerService {
     if (!this.currentRoom || !this.canStartGame()) return
 
     try {
+      console.log('🎮 Starting Firebase multiplayer game for room:', this.currentRoom.id)
+      
       const roomRef = ref(database, `rooms/${this.currentRoom.id}`)
-      await update(roomRef, { status: 'playing' })
+      await update(roomRef, { 
+        status: 'playing',
+        gameStartedAt: new Date().toISOString()
+      })
+      
+      console.log('✅ Room status updated to playing in Firebase')
       
     } catch (error) {
       console.error('Failed to start game:', error)
+      toast.error('Failed to start game. Please try again.')
     }
   }
 

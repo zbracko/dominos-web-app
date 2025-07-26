@@ -80,7 +80,11 @@ const MultiplayerPage: React.FC = () => {
     }
 
     const handleGameStarted = () => {
-      navigate('/game') // Fixed: navigate to /game instead of /multiplayer-game
+      console.log('🎮 Game started event received, navigating to game...')
+      // Give a small delay to ensure game context is properly updated
+      setTimeout(() => {
+        navigate('/game')
+      }, 100)
     }
 
     const handleRoomUpdated = (data: any) => {

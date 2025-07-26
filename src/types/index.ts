@@ -142,6 +142,7 @@ export interface GameRoom {
   gameSettings: GameSettings
   status: 'waiting' | 'playing' | 'finished'
   createdAt: string
+  gameStartedAt?: string
   gameState?: GameState
 }
 

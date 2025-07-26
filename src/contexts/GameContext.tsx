@@ -171,40 +171,49 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return
     }
 
+    console.log('🎮 Starting multiplayer game with room:', room)
+    
     setGameSettings(room.gameSettings)
     setIsMultiplayerGame(true)
     setCurrentRoom(room)
 
-    if (room.gameState) {
-      setGameState(room.gameState)
-    } else {
-      // Initialize new multiplayer game state
-      const players: Player[] = room.players.map(roomPlayer => ({
-        id: roomPlayer.id,
-        name: roomPlayer.name,
-        hand: [],
-        score: 0,
-        avatar: roomPlayer.avatar
-      }))
+    // Always initialize new game state for multiplayer games
+    // Create players from room data
+    const players: Player[] = room.players.map(roomPlayer => ({
+      id: roomPlayer.id,
+      name: roomPlayer.name,
+      hand: [],
+      score: 0,
+      isComputer: false, // Multiplayer players are never computer players
+      avatar: roomPlayer.avatar
+    }))
 
-      const dominoSet = shuffleArray(createDominoSet())
-      const { updatedPlayers, remainingTiles } = dealTiles(players, dominoSet)
+    // Generate and shuffle domino set
+    const dominoSet = shuffleArray(createDominoSet())
+    
+    // Deal tiles
+    const { updatedPlayers, remainingTiles } = dealTiles(players, dominoSet)
 
-      const newGameState: GameState = {
-        players: updatedPlayers,
-        currentPlayerIndex: 0,
-        board: [],
-        boneyard: remainingTiles,
-        gameStatus: 'playing',
-        targetScore: room.gameSettings.targetScore,
-        round: 1,
-        winner: null
-      }
+    // Debug logging for multiplayer game
+    console.log('🎲 Multiplayer Game Started:')
+    console.log('Room ID:', room.id)
+    console.log('Players:', updatedPlayers.map(p => ({ name: p.name, handSize: p.hand.length })))
+    console.log('Boneyard size:', remainingTiles.length)
 
-      setGameState(newGameState)
+    // Create initial game state
+    const newGameState: GameState = {
+      players: updatedPlayers,
+      currentPlayerIndex: 0,
+      board: [],
+      boneyard: remainingTiles,
+      gameStatus: 'playing',
+      targetScore: room.gameSettings.targetScore,
+      round: 1,
+      winner: null
     }
 
-    toast.success('Multiplayer game started! 🎮')
+    setGameState(newGameState)
+    toast.success(`🎮 ${room.players.length}-player game started!`)
   }
 
   const makeMove = (tileId: string, position: 'left' | 'right'): void => {
