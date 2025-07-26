@@ -177,28 +177,45 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsMultiplayerGame(true)
     setCurrentRoom(room)
 
-    // Always initialize new game state for multiplayer games
+    // ⚠️ CRITICAL FIX: Check if game state already exists in room
+    if (room.gameState) {
+      // Game state already exists, use it (for rejoining players)
+      console.log('📦 Using existing game state from room')
+      setGameState(room.gameState)
+      toast.success(`🎮 Rejoined ${room.players.length}-player game!`)
+      return
+    }
+
+    // ⚠️ CRITICAL FIX: Only host should initialize the game state
+    const currentPlayer = room.players.find(p => p.id === user.id)
+    const isHost = currentPlayer?.isHost || false
+
+    if (!isHost) {
+      // Non-host players wait for game state from host
+      console.log('⏳ Waiting for host to initialize game state...')
+      toast.success(`🎮 Joined ${room.players.length}-player game! Waiting for host...`)
+      return
+    }
+
+    // Host creates the initial game state
+    console.log('👑 Host initializing multiplayer game state')
+    
     // Create players from room data
     const players: Player[] = room.players.map(roomPlayer => ({
       id: roomPlayer.id,
       name: roomPlayer.name,
       hand: [],
       score: 0,
-      isComputer: false, // Multiplayer players are never computer players
+      isComputer: false,
       avatar: roomPlayer.avatar
     }))
 
-    // Generate and shuffle domino set
-    const dominoSet = shuffleArray(createDominoSet())
+    // Generate and shuffle domino set with FIXED SEED for consistency
+    const seed = parseInt(room.id.replace(/[^0-9]/g, '')) || Date.now()
+    const dominoSet = shuffleArray(createDominoSet(), seed)
     
     // Deal tiles
     const { updatedPlayers, remainingTiles } = dealTiles(players, dominoSet)
-
-    // Debug logging for multiplayer game
-    console.log('🎲 Multiplayer Game Started:')
-    console.log('Room ID:', room.id)
-    console.log('Players:', updatedPlayers.map(p => ({ name: p.name, handSize: p.hand.length })))
-    console.log('Boneyard size:', remainingTiles.length)
 
     // Create initial game state
     const newGameState: GameState = {
@@ -212,9 +229,88 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       winner: null
     }
 
+    console.log('🎲 Host created game state:', {
+      roomId: room.id,
+      players: updatedPlayers.map(p => ({ name: p.name, handSize: p.hand.length })),
+      boneyardSize: remainingTiles.length
+    })
+
     setGameState(newGameState)
+    
+    // ⚠️ CRITICAL FIX: Save game state to room for other players
+    updateRoomGameState(room, newGameState)
+    
     toast.success(`🎮 ${room.players.length}-player game started!`)
   }
+
+  // Helper function to update room with game state
+  const updateRoomGameState = async (room: GameRoom, gameState: GameState) => {
+    try {
+      // Get the appropriate multiplayer service
+      const firebaseService = (await import('../utils/firebaseMultiplayerService')).default.getInstance()
+      const localService = (await import('../utils/multiplayerService')).default.getInstance()
+      
+      // Check which service has the current room
+      const currentFirebaseRoom = firebaseService.getCurrentRoom()
+      const currentLocalRoom = localService.getCurrentRoom()
+      
+      if (currentFirebaseRoom?.id === room.id) {
+        // Update Firebase room with game state
+        await firebaseService.updateRoomGameState(room.id, gameState)
+      } else if (currentLocalRoom?.id === room.id) {
+        // Update local room with game state
+        localService.updateRoomGameState(room.id, gameState)
+      }
+    } catch (error) {
+      console.error('Failed to update room game state:', error)
+    }
+  }
+
+  // Listen for multiplayer room updates
+  useEffect(() => {
+    if (!isMultiplayerGame || !currentRoom || !user) return
+
+    const handleRoomUpdate = (data: { room: GameRoom }) => {
+      const updatedRoom = data.room
+      console.log('🔄 Room update received in GameContext:', updatedRoom)
+      
+      // Check if game state was added by host
+      if (updatedRoom.gameState && !gameState) {
+        console.log('📦 Receiving game state from host')
+        setGameState(updatedRoom.gameState)
+        setCurrentRoom(updatedRoom)
+        toast.success('🎮 Game synchronized with host!')
+      } else if (updatedRoom.gameState && gameState) {
+        // Update existing game state if it changed
+        setGameState(updatedRoom.gameState)
+        setCurrentRoom(updatedRoom)
+      }
+    }
+
+    // Get the appropriate multiplayer service and listen for updates
+    const setupRoomListener = async () => {
+      try {
+        const firebaseService = (await import('../utils/firebaseMultiplayerService')).default.getInstance()
+        const localService = (await import('../utils/multiplayerService')).default.getInstance()
+        
+        // Check which service has the current room
+        const currentFirebaseRoom = firebaseService.getCurrentRoom()
+        const currentLocalRoom = localService.getCurrentRoom()
+        
+        if (currentFirebaseRoom?.id === currentRoom.id) {
+          firebaseService.on('room_updated', handleRoomUpdate)
+          return () => firebaseService.off('room_updated', handleRoomUpdate)
+        } else if (currentLocalRoom?.id === currentRoom.id) {
+          localService.on('room_updated', handleRoomUpdate)
+          return () => localService.off('room_updated', handleRoomUpdate)
+        }
+      } catch (error) {
+        console.error('Failed to setup room listener:', error)
+      }
+    }
+
+    setupRoomListener()
+  }, [isMultiplayerGame, currentRoom, user, gameState])
 
   const makeMove = (tileId: string, position: 'left' | 'right'): void => {
     if (!gameState || !gameSettings || gameState.gameStatus !== 'playing') return

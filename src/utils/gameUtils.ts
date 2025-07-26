@@ -28,13 +28,30 @@ export const shuffleTiles = (tiles: DominoTile[]): DominoTile[] => {
   return shuffled
 }
 
-// Fisher-Yates shuffle algorithm
-export function shuffleArray<T>(array: T[]): T[] {
+// Fisher-Yates shuffle algorithm with optional seed for deterministic shuffling
+export function shuffleArray<T>(array: T[], seed?: number): T[] {
   const shuffled = [...array]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  
+  if (seed !== undefined) {
+    // Use seeded random for deterministic shuffling in multiplayer
+    let seedValue = seed
+    const seededRandom = () => {
+      seedValue = (seedValue * 9301 + 49297) % 233280
+      return seedValue / 233280
+    }
+    
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(seededRandom() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+  } else {
+    // Use normal random for single player
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
   }
+  
   return shuffled
 }
 

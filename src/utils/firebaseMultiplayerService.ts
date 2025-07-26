@@ -1,6 +1,6 @@
 import { database } from './firebase'
 import { ref, set, get, onValue, remove, update } from 'firebase/database'
-import { GameRoom, RoomPlayer, GameSettings, User } from '../types'
+import { GameRoom, RoomPlayer, GameSettings, User, GameState } from '../types'
 import toast from 'react-hot-toast'
 
 class FirebaseMultiplayerService {
@@ -197,6 +197,30 @@ class FirebaseMultiplayerService {
     } catch (error) {
       console.error('Failed to start game:', error)
       toast.error('Failed to start game. Please try again.')
+    }
+  }
+
+  // Update room with game state (critical for multiplayer sync)
+  public async updateRoomGameState(roomId: string, gameState: GameState): Promise<void> {
+    try {
+      console.log('🔄 Updating Firebase room game state:', roomId)
+      
+      const roomRef = ref(database, `rooms/${roomId}`)
+      await update(roomRef, { 
+        gameState,
+        lastUpdated: new Date().toISOString()
+      })
+      
+      console.log('✅ Firebase room game state updated successfully')
+      
+      // Update local currentRoom if it matches
+      if (this.currentRoom?.id === roomId) {
+        this.currentRoom.gameState = gameState
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to update Firebase room game state:', error)
+      throw error
     }
   }
 

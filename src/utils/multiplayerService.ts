@@ -1,4 +1,4 @@
-import { GameRoom, RoomPlayer, GameSettings, User } from '../types'
+import { GameRoom, RoomPlayer, GameSettings, User, GameState } from '../types'
 import toast from 'react-hot-toast'
 
 class MultiplayerService {
@@ -187,6 +187,37 @@ class MultiplayerService {
     }
 
     this.emit('move_made', move)
+  }
+
+  // Update room with game state (critical for multiplayer sync)
+  public updateRoomGameState(roomId: string, gameState: GameState): void {
+    try {
+      console.log('🔄 Updating local room game state:', roomId)
+      
+      const room = this.loadRoomFromStorage(roomId)
+      if (!room) {
+        console.error('❌ Room not found for game state update:', roomId)
+        return
+      }
+      
+      room.gameState = gameState
+      room.lastUpdated = new Date().toISOString()
+      this.saveRoomToStorage(room)
+      
+      console.log('✅ Local room game state updated successfully')
+      
+      // Update local currentRoom if it matches
+      if (this.currentRoom?.id === roomId) {
+        this.currentRoom.gameState = gameState
+      }
+      
+      // Emit update event
+      this.emit('room_updated', { room })
+      
+    } catch (error) {
+      console.error('❌ Failed to update local room game state:', error)
+      throw error
+    }
   }
 
   // Generate a 4-character room code

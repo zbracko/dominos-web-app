@@ -143,6 +143,7 @@ export interface GameRoom {
   status: 'waiting' | 'playing' | 'finished'
   createdAt: string
   gameStartedAt?: string
+  lastUpdated?: string
   gameState?: GameState
 }
 
