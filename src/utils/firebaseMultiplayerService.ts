@@ -316,6 +316,85 @@ class FirebaseMultiplayerService {
     this.currentRoom = null
     this.eventListeners = {}
   }
+
+  // Get all active games for a user
+  public async getUserActiveGames(userId: string): Promise<GameRoom[]> {
+    try {
+      const roomsRef = ref(database, 'rooms')
+      const snapshot = await get(roomsRef)
+      
+      if (!snapshot.exists()) return []
+      
+      const allRooms = snapshot.val() as { [key: string]: GameRoom }
+      const userGames = Object.values(allRooms).filter(room => 
+        room.players.some(player => player.id === userId)
+      )
+      
+      return userGames
+    } catch (error) {
+      console.error('Failed to get user active games:', error)
+      return []
+    }
+  }
+
+  // Rejoin an existing game
+  public async rejoinGame(roomId: string, userId: string): Promise<GameRoom | null> {
+    try {
+      const roomRef = ref(database, `rooms/${roomId}`)
+      const snapshot = await get(roomRef)
+      
+      if (!snapshot.exists()) {
+        toast.error('Game no longer exists')
+        return null
+      }
+      
+      const room = snapshot.val() as GameRoom
+      const userInRoom = room.players.find(p => p.id === userId)
+      
+      if (!userInRoom) {
+        toast.error('You are not part of this game')
+        return null
+      }
+      
+      // Mark player as connected
+      const updatedPlayers = room.players.map(p => 
+        p.id === userId ? { ...p, isConnected: true } : p
+      )
+      
+      await update(roomRef, { players: updatedPlayers })
+      
+      this.currentRoom = { ...room, players: updatedPlayers }
+      this.listenToRoomChanges(roomId)
+      
+      toast.success(`Rejoined game ${roomId}!`)
+      return this.currentRoom
+    } catch (error) {
+      console.error('Failed to rejoin game:', error)
+      toast.error('Failed to rejoin game')
+      return null
+    }
+  }
+
+  // Send a move to other players  
+  public async sendMove(playerId: string, tileId: string, position: 'left' | 'right'): Promise<void> {
+    if (!this.currentRoom) return
+
+    try {
+      const move = {
+        playerId,
+        tileId,
+        position,
+        timestamp: Date.now()
+      }
+
+      const moveRef = ref(database, `rooms/${this.currentRoom.id}/moves/${Date.now()}`)
+      await set(moveRef, move)
+      
+      this.emit('move_made', { move })
+    } catch (error) {
+      console.error('Failed to send move:', error)
+    }
+  }
 }
 
 export default FirebaseMultiplayerService

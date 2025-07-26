@@ -240,6 +240,53 @@ class MultiplayerService {
     }
   }
 
+  // Get all active games for a user
+  public getUserActiveGames(userId: string): GameRoom[] {
+    try {
+      const activeRooms = this.getActiveRooms()
+      return activeRooms.filter(room => 
+        room.players.some(player => player.id === userId)
+      )
+    } catch (error) {
+      console.error('Failed to get user active games:', error)
+      return []
+    }
+  }
+
+  // Rejoin an existing game
+  public rejoinGame(roomId: string, userId: string): GameRoom | null {
+    try {
+      const room = this.loadRoomFromStorage(roomId)
+      if (!room) {
+        toast.error('Game no longer exists')
+        return null
+      }
+      
+      const userInRoom = room.players.find(p => p.id === userId)
+      if (!userInRoom) {
+        toast.error('You are not part of this game')
+        return null
+      }
+      
+      // Mark player as connected
+      room.players.forEach(p => {
+        if (p.id === userId) {
+          p.isConnected = true
+        }
+      })
+      
+      this.currentRoom = room
+      this.saveRoomToStorage(room)
+      
+      toast.success(`Rejoined game ${roomId}!`)
+      return room
+    } catch (error) {
+      console.error('Failed to rejoin game:', error)
+      toast.error('Failed to rejoin game')
+      return null
+    }
+  }
+
   // Event system for real-time updates
   public on(event: string, callback: Function): void {
     if (!this.eventListeners[event]) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Users, Share2, Copy, Crown, UserCheck, UserX, Play, Wifi, WifiOff } from 'lucide-react'
+import { ArrowLeft, Users, Share2, Copy, Crown, UserCheck, UserX, Play, Wifi, WifiOff, GamepadIcon, Clock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import MultiplayerService from '../utils/multiplayerService'
 import FirebaseMultiplayerService from '../utils/firebaseMultiplayerService'
@@ -12,6 +12,7 @@ const MultiplayerPage: React.FC = () => {
   const { user, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const [currentRoom, setCurrentRoom] = useState<GameRoom | null>(null)
+  const [activeGames, setActiveGames] = useState<GameRoom[]>([])
   const [roomCode, setRoomCode] = useState('')
   const [showCreateRoom, setShowCreateRoom] = useState(false)
   const [useFirebase, setUseFirebase] = useState(true) // Default to Firebase for online play
@@ -29,11 +30,35 @@ const MultiplayerPage: React.FC = () => {
     return useFirebase ? FirebaseMultiplayerService.getInstance() : MultiplayerService.getInstance()
   }
 
+  // Load active games for the user
+  const loadActiveGames = async () => {
+    if (!user) return
+
+    try {
+      const multiplayerService = getMultiplayerService()
+      
+      if (useFirebase) {
+        const firebaseService = multiplayerService as FirebaseMultiplayerService
+        const games = await firebaseService.getUserActiveGames(user.id)
+        setActiveGames(games)
+      } else {
+        const localService = multiplayerService as MultiplayerService
+        const games = localService.getUserActiveGames(user.id)
+        setActiveGames(games)
+      }
+    } catch (error) {
+      console.error('Failed to load active games:', error)
+    }
+  }
+
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login')
       return
     }
+
+    // Load active games when component mounts or service changes
+    loadActiveGames()
 
     const multiplayerService = getMultiplayerService()
 
@@ -60,6 +85,8 @@ const MultiplayerPage: React.FC = () => {
 
     const handleRoomUpdated = (data: any) => {
       setCurrentRoom(data.room)
+      // Refresh active games when room updates
+      loadActiveGames()
     }
 
     multiplayerService.on('player_joined', handlePlayerJoined)
@@ -74,6 +101,40 @@ const MultiplayerPage: React.FC = () => {
       multiplayerService.off('room_updated', handleRoomUpdated)
     }
   }, [isAuthenticated, navigate, useFirebase])
+
+  // Rejoin an existing game
+  const handleRejoinGame = async (roomId: string) => {
+    if (!user) return
+
+    setIsConnecting(true)
+    try {
+      const multiplayerService = getMultiplayerService()
+      
+      if (useFirebase) {
+        const firebaseService = multiplayerService as FirebaseMultiplayerService
+        const room = await firebaseService.rejoinGame(roomId, user.id)
+        if (room) {
+          setCurrentRoom(room)
+          if (room.status === 'playing') {
+            navigate('/game')
+          }
+        }
+      } else {
+        const localService = multiplayerService as MultiplayerService
+        const room = localService.rejoinGame(roomId, user.id)
+        if (room) {
+          setCurrentRoom(room)
+          if (room.status === 'playing') {
+            navigate('/game')
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to rejoin game:', error)
+    } finally {
+      setIsConnecting(false)
+    }
+  }
 
   const handleCreateRoom = async () => {
     if (!user) return
@@ -250,6 +311,62 @@ const MultiplayerPage: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Active Games */}
+          {activeGames.length > 0 && (
+            <div className="glass-card p-6">
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <GamepadIcon className="text-purple-400" size={24} />
+                Your Active Games
+              </h2>
+              <div className="space-y-3">
+                {activeGames.map((game) => (
+                  <motion.div
+                    key={game.id}
+                    className="p-4 bg-white/5 rounded-lg border border-white/10 hover:border-purple-400/50 transition-colors"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono font-bold text-white">{game.id}</span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            game.status === 'waiting' 
+                              ? 'bg-yellow-500/20 text-yellow-300' 
+                              : 'bg-green-500/20 text-green-300'
+                          }`}>
+                            {game.status === 'waiting' ? 'Lobby' : 'Playing'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-domino-300">
+                          <div className="flex items-center gap-4">
+                            <span>Host: {game.hostName}</span>
+                            <span>Players: {game.players.length}/{game.gameSettings.playerCount}</span>
+                            <span>Score: {game.gameSettings.targetScore}</span>
+                          </div>
+                          <div className="flex items-center gap-1 mt-1">
+                            <Clock size={12} />
+                            <span className="text-xs">
+                              {new Date(game.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <motion.button
+                        onClick={() => handleRejoinGame(game.id)}
+                        className="px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
+                        whileTap={{ scale: 0.95 }}
+                        disabled={isConnecting}
+                      >
+                        {game.status === 'waiting' ? 'Rejoin Lobby' : 'Continue Game'}
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {!currentRoom ? (
             <>

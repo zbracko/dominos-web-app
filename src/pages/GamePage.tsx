@@ -36,29 +36,40 @@ const GamePage: React.FC = () => {
       }
 
       // Check if we should initialize a multiplayer game
-      if (!gameState) {
-        const localMultiplayerService = MultiplayerService.getInstance()
-        const firebaseMultiplayerService = FirebaseMultiplayerService.getInstance()
-        
-        // Check local service first
-        let currentRoom = localMultiplayerService.getCurrentRoom()
-        
-        // If no local room, check Firebase service
-        if (!currentRoom) {
-          currentRoom = firebaseMultiplayerService.getCurrentRoom()
-        }
-        
-        if (currentRoom && currentRoom.status === 'playing') {
+      const localMultiplayerService = MultiplayerService.getInstance()
+      const firebaseMultiplayerService = FirebaseMultiplayerService.getInstance()
+      
+      // Check Firebase service first (preferred for online games)
+      let currentRoom = firebaseMultiplayerService.getCurrentRoom()
+      let isFirebaseGame = true
+      
+      // If no Firebase room, check local service
+      if (!currentRoom) {
+        currentRoom = localMultiplayerService.getCurrentRoom()
+        isFirebaseGame = false
+      }
+      
+      if (currentRoom) {
+        if (currentRoom.status === 'playing') {
           // Initialize multiplayer game from room data
           console.log('Initializing multiplayer game from room:', currentRoom)
           startMultiplayerGame(currentRoom)
-          toast.success(`Multiplayer game started!`, { icon: '🎮' })
+          toast.success(`${isFirebaseGame ? 'Online' : 'Local'} multiplayer game started!`, { icon: '🎮' })
+        } else if (currentRoom.status === 'waiting') {
+          // Still in lobby, redirect back to multiplayer
+          console.log('Game room still in lobby, redirecting to multiplayer')
+          navigate('/multiplayer')
         } else {
-          // No active multiplayer game, redirect to home
-          console.log('No active game or room found, redirecting to home')
+          // Room exists but not in valid state
+          console.log('Room in invalid state, redirecting to home')
           navigate('/')
         }
+      } else {
+        // No active multiplayer game, redirect to home
+        console.log('No active game or room found, redirecting to home')
+        navigate('/')
       }
+      
       setIsInitializing(false)
     }
 
